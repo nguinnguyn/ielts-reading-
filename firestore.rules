@@ -1,0 +1,103 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Default-Deny Catch-All
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Hardened Global Helpers
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    // Validation Blueprint: Exam
+    function isValidExam(data) {
+      return data.keys().hasAll(['ownerId', 'title', 'partCount', 'questionCount', 'keyCount', 'examPayload', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['ownerId', 'title', 'partCount', 'questionCount', 'keyCount', 'examPayload', 'createdAt', 'updatedAt'])
+        && data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 && data.ownerId.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.ownerId == request.auth.uid
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 200
+        && data.partCount is int && data.partCount >= 1 && data.partCount <= 10
+        && data.questionCount is int && data.questionCount >= 0 && data.questionCount <= 100
+        && data.keyCount is int && data.keyCount >= 0 && data.keyCount <= 100
+        && data.examPayload is map && data.examPayload.size() >= 1 && data.examPayload.size() <= 20
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    // Validation Blueprint: Attempt
+    function isValidAttempt(data) {
+      return data.keys().hasAll(['ownerId', 'examId', 'examTitle', 'score', 'totalQuestions', 'bandScore', 'timeSpentSeconds', 'userAnswers', 'notesRegistry', 'savedPassageHtml', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['ownerId', 'examId', 'examTitle', 'score', 'totalQuestions', 'bandScore', 'timeSpentSeconds', 'userAnswers', 'notesRegistry', 'savedPassageHtml', 'createdAt', 'updatedAt'])
+        && data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 && data.ownerId.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.ownerId == request.auth.uid
+        && data.examId is string && data.examId.size() >= 1 && data.examId.size() <= 128 && data.examId.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.examTitle is string && data.examTitle.size() >= 1 && data.examTitle.size() <= 200
+        && data.score is int && data.score >= 0 && data.score <= 100
+        && data.totalQuestions is int && data.totalQuestions >= 0 && data.totalQuestions <= 100
+        && (data.bandScore is int || data.bandScore is float) && data.bandScore >= 0 && data.bandScore <= 9
+        && data.timeSpentSeconds is int && data.timeSpentSeconds >= 0 && data.timeSpentSeconds <= 86400
+        && data.userAnswers is map && data.userAnswers.size() <= 100
+        && data.notesRegistry is map && data.notesRegistry.size() <= 200
+        && data.savedPassageHtml is map && data.savedPassageHtml.size() <= 10
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    // Collection: /exams/{examId}
+    match /exams/{examId} {
+      allow get: if isSignedIn() && isValidId(examId) && existing().ownerId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn()
+        && isValidId(examId)
+        && isValidExam(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isSignedIn()
+        && isValidId(examId)
+        && isValidExam(incoming())
+        && existing().ownerId == request.auth.uid
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'examPayload', 'partCount', 'questionCount', 'keyCount', 'updatedAt']);
+      allow delete: if isSignedIn() && isValidId(examId) && existing().ownerId == request.auth.uid;
+    }
+
+    // Collection: /attempts/{attemptId}
+    match /attempts/{attemptId} {
+      allow get: if isSignedIn() && isValidId(attemptId) && existing().ownerId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn()
+        && isValidId(attemptId)
+        && isValidAttempt(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && exists(/databases/$(database)/documents/exams/$(incoming().examId))
+        && get(/databases/$(database)/documents/exams/$(incoming().examId)).data.ownerId == request.auth.uid;
+      allow update: if isSignedIn()
+        && isValidId(attemptId)
+        && isValidAttempt(incoming())
+        && existing().ownerId == request.auth.uid
+        && incoming().ownerId == existing().ownerId
+        && incoming().examId == existing().examId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['notesRegistry', 'savedPassageHtml', 'updatedAt']);
+      allow delete: if isSignedIn() && isValidId(attemptId) && existing().ownerId == request.auth.uid;
+    }
+  }
+}

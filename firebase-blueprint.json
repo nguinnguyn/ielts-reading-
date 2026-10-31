@@ -1,0 +1,153 @@
+{
+  "entities": {
+    "Exam": {
+      "title": "Exam",
+      "description": "An uploaded and parsed IELTS Reading exam with passages, questions, and answer keys.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "description": "UID of the authenticated user who owns this exam.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "title": {
+          "type": "string",
+          "description": "Title of the IELTS Reading exam.",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "partCount": {
+          "type": "integer",
+          "description": "Number of reading passages in the exam."
+        },
+        "questionCount": {
+          "type": "integer",
+          "description": "Total number of questions extracted."
+        },
+        "keyCount": {
+          "type": "integer",
+          "description": "Total number of answer keys extracted."
+        },
+        "examPayload": {
+          "type": "object",
+          "description": "Structured map containing parts, questions, and answers."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the exam was created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the exam was last updated."
+        }
+      },
+      "required": [
+        "ownerId",
+        "title",
+        "partCount",
+        "questionCount",
+        "keyCount",
+        "examPayload",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Attempt": {
+      "title": "Attempt",
+      "description": "A user's test attempt including recorded answers, band score, time spent, and highlights/notes.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "description": "UID of the user who completed the attempt.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "examId": {
+          "type": "string",
+          "description": "ID of the associated Exam document.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "examTitle": {
+          "type": "string",
+          "description": "Snapshot title of the exam.",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "score": {
+          "type": "integer",
+          "description": "Number of correct answers."
+        },
+        "totalQuestions": {
+          "type": "integer",
+          "description": "Total number of questions in the exam."
+        },
+        "bandScore": {
+          "type": "number",
+          "description": "Calculated IELTS Reading band score (0.0 to 9.0)."
+        },
+        "timeSpentSeconds": {
+          "type": "integer",
+          "description": "Total elapsed time in seconds."
+        },
+        "userAnswers": {
+          "type": "object",
+          "description": "Map of question ID to user answer."
+        },
+        "notesRegistry": {
+          "type": "object",
+          "description": "Map of highlight ID to highlight metadata and sticky note."
+        },
+        "savedPassageHtml": {
+          "type": "object",
+          "description": "Map of part ID to highlighted passage HTML."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the attempt was submitted."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the attempt was last updated."
+        }
+      },
+      "required": [
+        "ownerId",
+        "examId",
+        "examTitle",
+        "score",
+        "totalQuestions",
+        "bandScore",
+        "timeSpentSeconds",
+        "userAnswers",
+        "notesRegistry",
+        "savedPassageHtml",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/exams/{examId}": {
+      "schema": {
+        "$ref": "#/entities/Exam"
+      },
+      "description": "Stores parsed IELTS Reading exams owned by individual users."
+    },
+    "/attempts/{attemptId}": {
+      "schema": {
+        "$ref": "#/entities/Attempt"
+      },
+      "description": "Stores completed IELTS Reading test attempts, scores, and highlights."
+    }
+  }
+}

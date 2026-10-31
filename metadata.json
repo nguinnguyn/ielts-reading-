@@ -1,0 +1,6 @@
+{
+  "name": "IELTS on Computer — Reading Simulator",
+  "description": "Interactive computer-delivered IELTS Reading exam simulator with AI-powered universal PDF scanner, 5-color highlighter, sticky notes, auto-grading, and Firebase cloud sync.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

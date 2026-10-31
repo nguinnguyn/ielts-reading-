@@ -1,0 +1,1439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IELTS on Computer — Reading Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
+    <style>
+        * { box-sizing: border-box; }
+        .split-pane { display: flex; height: calc(100vh - 104px); }
+        .pane { overflow-y: auto; padding: 1.5rem 2rem; }
+        .resizer { width: 6px; background: #cbd5e1; cursor: col-resize; transition: background 0.15s; flex-shrink: 0; }
+        .resizer:hover, .resizer.active { background: #2563eb; }
+
+        /* 5-Color Highlight Palette */
+        .hl-yellow { background-color: #fef08a; color: #0f172a; padding: 1px 2px; border-radius: 2px; cursor: pointer; }
+        .hl-green  { background-color: #bbf7d0; color: #0f172a; padding: 1px 2px; border-radius: 2px; cursor: pointer; }
+        .hl-blue   { background-color: #bfdbfe; color: #0f172a; padding: 1px 2px; border-radius: 2px; cursor: pointer; }
+        .hl-pink   { background-color: #fbcfe8; color: #0f172a; padding: 1px 2px; border-radius: 2px; cursor: pointer; }
+        .hl-orange { background-color: #fed7aa; color: #0f172a; padding: 1px 2px; border-radius: 2px; cursor: pointer; }
+        .has-note  { border-bottom: 2px dashed #dc2626; }
+
+        /* Contrast Themes */
+        .theme-default { background-color: #f8fafc; color: #0f172a; }
+        .theme-dark { background-color: #0f172a; color: #f8fafc; }
+        .theme-dark .pane { background-color: #1e293b; color: #f1f5f9; border-color: #334155; }
+        .theme-dark .q-card { background-color: #0f172a; border-color: #334155; color: #f1f5f9; }
+        .theme-dark .group-banner { background-color: #334155; color: #f8fafc; border-color: #60a5fa; }
+        .theme-dark input[type="text"], .theme-dark select { background-color: #1e293b; color: #ffffff; border-color: #64748b; }
+
+        .theme-yellow { background-color: #000000; color: #facc15; }
+        .theme-yellow .pane { background-color: #000000; color: #facc15; border-color: #ca8a04; }
+        .theme-yellow .q-card { background-color: #111111; border-color: #ca8a04; color: #facc15; }
+        .theme-yellow .group-banner { background-color: #1c1917; color: #facc15; border-color: #facc15; }
+        .theme-yellow input[type="text"], .theme-yellow select { background-color: #000000; color: #facc15; border-color: #facc15; }
+
+        /* High-Contrast Question Number Buttons (Fixes black-on-dark issue) */
+        .nav-q-btn {
+            width: 28px;
+            height: 28px;
+            font-size: 12px;
+            font-weight: 700;
+            border-radius: 4px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: all 0.12s ease;
+            border: 1px solid #475569;
+            background-color: #ffffff;
+            color: #0f172a;
+        }
+        .nav-q-btn:hover {
+            border-color: #3b82f6;
+            background-color: #eff6ff;
+            color: #1d4ed8;
+        }
+        .nav-q-btn.answered {
+            background-color: #2563eb;
+            color: #ffffff;
+            border-color: #1d4ed8;
+        }
+        .nav-q-btn.reviewed {
+            background-color: #f59e0b;
+            color: #ffffff;
+            border-color: #d97706;
+            border-radius: 9999px;
+        }
+        .nav-q-btn.current {
+            outline: 2px solid #38bdf8;
+            outline-offset: 1px;
+        }
+    </style>
+</head>
+<body class="theme-default h-screen flex flex-col overflow-hidden font-sans antialiased">
+
+    <!-- SCREEN 1: CLEAN PDF UPLOAD & TIMER SETUP (NO SAMPLE TESTS) -->
+    <div id="setup-screen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/90 p-4 overflow-y-auto">
+        <div class="bg-white text-slate-900 rounded-xl shadow-2xl max-w-xl w-full p-6 border border-slate-200 my-auto">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-200 mb-5">
+                <div>
+                    <h1 class="text-lg font-bold text-slate-900">IELTS on Computer — Reading Simulator</h1>
+                    <p class="text-xs text-slate-500">Upload any IELTS Reading PDF file to convert it into an interactive test.</p>
+                </div>
+                <span class="px-2.5 py-1 bg-blue-50 text-blue-700 text-[11px] font-bold rounded border border-blue-200">UNIVERSAL SCANNER</span>
+            </div>
+
+            <div class="space-y-4">
+                <!-- Step 1: Upload PDF -->
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">1. Upload IELTS Reading PDF</label>
+                    <div id="drop-zone" class="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center hover:border-blue-600 transition-colors bg-slate-50 cursor-pointer" onclick="document.getElementById('pdf-file-input').click()">
+                        <input type="file" id="pdf-file-input" accept=".pdf" class="hidden" onchange="handleFileSelect(event)">
+                        <svg class="w-8 h-8 text-slate-400 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                        <p id="file-name-display" class="text-sm font-semibold text-slate-800">Click or drag & drop your PDF file here</p>
+                        <p class="text-xs text-slate-500 mt-1">Automatically ignores watermarks/footnotes & detects passages, questions, and answer keys anywhere in the file</p>
+                    </div>
+
+                    <div id="parse-status" class="hidden mt-2.5 text-xs font-medium rounded-lg px-3 py-2 border"></div>
+                </div>
+
+                <!-- Optional Gemini API Key for Deep AI Layout Parsing -->
+                <div class="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                    <div class="flex items-center justify-between">
+                        <label class="text-xs font-bold text-slate-700">Optional: Gemini API Key (for complex/irregular PDFs)</label>
+                        <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-[11px] font-semibold text-blue-600 hover:underline">Get Free Key ↗</a>
+                    </div>
+                    <input type="password" id="gemini-api-key" placeholder="Paste AIzaSy... key (optional — local universal scanner runs by default)" class="mt-1.5 w-full px-2.5 py-1.5 border border-slate-300 rounded text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none" oninput="localStorage.setItem('ielts_gemini_key', this.value.trim())">
+                </div>
+
+                <!-- Step 2: Timer Configuration -->
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">2. Set Timer</label>
+                    <div class="grid grid-cols-4 gap-2 mb-2">
+                        <button type="button" onclick="setTimerPreset(20)" id="preset-20" class="py-2 text-xs font-bold rounded border border-slate-300 hover:bg-slate-100 text-slate-800">20 mins</button>
+                        <button type="button" onclick="setTimerPreset(40)" id="preset-40" class="py-2 text-xs font-bold rounded border border-slate-300 hover:bg-slate-100 text-slate-800">40 mins</button>
+                        <button type="button" onclick="setTimerPreset(60)" id="preset-60" class="py-2 text-xs font-bold rounded border border-blue-600 bg-blue-600 text-white">60 mins</button>
+                        <button type="button" onclick="setTimerPreset(0)" id="preset-0" class="py-2 text-xs font-bold rounded border border-slate-300 hover:bg-slate-100 text-slate-800">Untimed</button>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="text-xs text-slate-600">Custom (minutes):</span>
+                        <input type="number" id="custom-minutes-input" value="60" min="0" max="240" class="w-20 px-2 py-1 border border-slate-300 rounded text-xs font-bold text-slate-900" oninput="clearPresetHighlight()">
+                        <span class="text-[11px] text-slate-400">(0 = Untimed)</span>
+                    </div>
+                </div>
+
+                <button type="button" id="start-test-btn" onclick="startExam()" disabled class="w-full py-2.5 bg-slate-300 text-slate-500 font-bold text-sm rounded-lg transition-all cursor-not-allowed">
+                    Upload a PDF to Start Test
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCREEN 2: INSPERA EXAM WORKSPACE -->
+    <div id="exam-app" class="flex flex-col h-screen hidden">
+        <!-- TOP BAR -->
+        <header class="h-12 bg-slate-900 text-white px-4 flex items-center justify-between border-b border-slate-800 shrink-0">
+            <div class="flex items-center space-x-3">
+                <span class="font-bold text-sm tracking-wide text-white">IELTS Reading</span>
+                <div class="flex space-x-1" id="part-tabs-container"></div>
+            </div>
+
+            <!-- Timer -->
+            <div class="flex items-center space-x-2">
+                <span id="timer-display" class="font-mono font-bold text-sm text-amber-400">60:00</span>
+                <button onclick="toggleTimerVisibility()" class="text-xs text-slate-300 hover:text-white border border-slate-700 px-2 py-0.5 rounded">Hide/Show</button>
+                <button onclick="promptAdjustTimer()" class="text-xs text-slate-300 hover:text-white border border-slate-700 px-2 py-0.5 rounded">Set Time</button>
+            </div>
+
+            <!-- Controls -->
+            <div class="flex items-center space-x-2">
+                <button onclick="toggleNotesDrawer()" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-xs font-semibold rounded border border-slate-700 text-white">
+                    Notes (<span id="notes-count">0</span>)
+                </button>
+                <select onchange="setTheme(this.value)" class="bg-slate-800 text-white text-xs px-2 py-1 rounded border border-slate-700">
+                    <option value="default">Black on White</option>
+                    <option value="dark">White on Black</option>
+                    <option value="yellow">Yellow on Black</option>
+                </select>
+                <select onchange="setFontSize(this.value)" class="bg-slate-800 text-white text-xs px-2 py-1 rounded border border-slate-700">
+                    <option value="text-sm">Standard</option>
+                    <option value="text-base">Large</option>
+                    <option value="text-lg">Extra Large</option>
+                </select>
+                <button onclick="openSetupScreen()" class="px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-xs font-semibold rounded text-white">Upload New PDF</button>
+                <button onclick="submitAndGradeTest()" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded">Submit</button>
+            </div>
+        </header>
+
+        <!-- SUB-HEADER BANNER -->
+        <div id="sub-header-bar" class="h-8 bg-slate-100 border-b border-slate-300 px-6 flex items-center justify-between text-xs font-semibold text-slate-700 shrink-0">
+            <span id="sub-header-left">Part 1</span>
+            <span id="sub-header-right">Read the passage and answer the questions.</span>
+        </div>
+
+        <!-- SPLIT-PANE WORKSPACE -->
+        <div class="split-pane flex-1 relative" id="split-pane">
+            <!-- Left Pane: Reading Passage -->
+            <div class="pane w-1/2 border-r border-slate-300 bg-white select-text" id="left-pane">
+                <h2 id="passage-title" class="text-lg font-bold mb-3"></h2>
+                <div id="passage-content" class="text-sm leading-relaxed space-y-3.5"></div>
+            </div>
+
+            <!-- Resizer -->
+            <div class="resizer" id="resizer" title="Drag to resize"></div>
+
+            <!-- Right Pane: Questions -->
+            <div class="pane w-1/2 bg-white select-text" id="right-pane">
+                <div id="questions-container" class="space-y-4 text-sm"></div>
+            </div>
+
+            <!-- Notes Drawer -->
+            <div id="notes-drawer" class="hidden absolute right-0 top-0 bottom-0 w-80 bg-white border-l border-slate-300 shadow-xl z-30 flex flex-col text-slate-900">
+                <div class="px-4 py-3 bg-slate-100 border-b border-slate-200 flex items-center justify-between">
+                    <span class="font-bold text-xs uppercase tracking-wider">Highlights & Notes</span>
+                    <button onclick="toggleNotesDrawer()" class="text-slate-500 hover:text-slate-900 font-bold">&times;</button>
+                </div>
+                <div id="notes-list" class="p-3 overflow-y-auto flex-1 space-y-2 text-xs"></div>
+            </div>
+        </div>
+
+        <!-- BOTTOM NAVIGATION BAR (HIGH CONTRAST NUMBERS) -->
+        <footer class="h-12 bg-slate-900 text-white px-4 flex items-center justify-between border-t border-slate-800 shrink-0">
+            <div class="flex items-center space-x-1.5 overflow-x-auto py-1" id="bottom-nav-questions"></div>
+            <div class="flex items-center space-x-3 text-xs text-slate-300 shrink-0 ml-3">
+                <label class="flex items-center space-x-1.5 cursor-pointer text-amber-400 font-bold">
+                    <input type="checkbox" id="review-current-checkbox" onchange="toggleCurrentQuestionReview(this.checked)" class="rounded">
+                    <span>Review</span>
+                </label>
+                <span class="flex items-center space-x-1"><span class="w-3 h-3 rounded-sm bg-white border border-slate-400 inline-block"></span><span>Unanswered</span></span>
+                <span class="flex items-center space-x-1"><span class="w-3 h-3 rounded-sm bg-blue-600 inline-block"></span><span>Answered</span></span>
+                <span class="flex items-center space-x-1"><span class="w-3 h-3 rounded-full bg-amber-500 inline-block"></span><span>Review</span></span>
+            </div>
+        </footer>
+    </div>
+
+    <!-- 5-COLOR SELECTION HIGHLIGHT / NOTE TOOLBAR -->
+    <div id="float-toolbar" class="hidden fixed z-50 bg-slate-900 text-white rounded-lg shadow-xl px-2.5 py-1.5 flex items-center space-x-1.5 text-xs border border-slate-700">
+        <button onclick="applyHighlight('hl-yellow')" class="w-4 h-4 rounded-full bg-yellow-300 border border-white/40 hover:scale-110 transition-transform" title="Yellow"></button>
+        <button onclick="applyHighlight('hl-green')" class="w-4 h-4 rounded-full bg-green-300 border border-white/40 hover:scale-110 transition-transform" title="Green"></button>
+        <button onclick="applyHighlight('hl-blue')" class="w-4 h-4 rounded-full bg-blue-300 border border-white/40 hover:scale-110 transition-transform" title="Blue"></button>
+        <button onclick="applyHighlight('hl-pink')" class="w-4 h-4 rounded-full bg-pink-300 border border-white/40 hover:scale-110 transition-transform" title="Pink"></button>
+        <button onclick="applyHighlight('hl-orange')" class="w-4 h-4 rounded-full bg-orange-300 border border-white/40 hover:scale-110 transition-transform" title="Orange"></button>
+        <span class="text-slate-600 pl-1">|</span>
+        <button onclick="openNotePopoverForSelection()" class="hover:text-amber-300 font-semibold px-1">+ Note</button>
+    </div>
+
+    <!-- HIGHLIGHT / STICKY NOTE EDITOR POPOVER -->
+    <div id="note-popover" class="hidden fixed z-50 bg-white text-slate-900 rounded-lg shadow-2xl border border-slate-300 w-72 p-3 space-y-2.5 text-xs">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-1.5">
+            <div class="flex items-center space-x-1.5">
+                <button onclick="changeActiveHighlightColor('hl-yellow')" class="w-4 h-4 rounded-full bg-yellow-300 border border-slate-400"></button>
+                <button onclick="changeActiveHighlightColor('hl-green')" class="w-4 h-4 rounded-full bg-green-300 border border-slate-400"></button>
+                <button onclick="changeActiveHighlightColor('hl-blue')" class="w-4 h-4 rounded-full bg-blue-300 border border-slate-400"></button>
+                <button onclick="changeActiveHighlightColor('hl-pink')" class="w-4 h-4 rounded-full bg-pink-300 border border-slate-400"></button>
+                <button onclick="changeActiveHighlightColor('hl-orange')" class="w-4 h-4 rounded-full bg-orange-300 border border-slate-400"></button>
+            </div>
+            <button onclick="closeNotePopover()" class="text-slate-400 hover:text-slate-700 font-bold text-sm">&times;</button>
+        </div>
+        <textarea id="note-textarea" rows="3" placeholder="Write a note for this highlight..." class="w-full p-2 border border-slate-300 rounded text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none"></textarea>
+        <div class="flex items-center justify-between pt-1">
+            <button onclick="removeActiveHighlight()" class="text-rose-600 hover:underline font-semibold">Remove Highlight</button>
+            <button onclick="saveActiveNote()" class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded">Save</button>
+        </div>
+    </div>
+
+    <!-- SCORE REPORT MODAL -->
+    <div id="result-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 p-4">
+        <div class="bg-white text-slate-900 rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden border border-slate-300">
+            <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+                <div>
+                    <h2 class="text-base font-bold">IELTS Reading — Test Results</h2>
+                    <p class="text-xs text-slate-400" id="report-test-title"></p>
+                </div>
+                <button onclick="closeResultModal()" class="text-slate-400 hover:text-white text-xl font-bold">&times;</button>
+            </div>
+            <div class="p-6 overflow-y-auto space-y-5 flex-1">
+                <div class="grid grid-cols-3 gap-4">
+                    <div class="bg-slate-50 border border-slate-200 rounded-lg p-3.5 text-center">
+                        <div class="text-xs font-bold text-slate-500 uppercase">Correct Answers</div>
+                        <div id="res-score" class="text-2xl font-extrabold text-slate-900 mt-1">0 / 40</div>
+                    </div>
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-3.5 text-center">
+                        <div class="text-xs font-bold text-blue-700 uppercase">IELTS Band</div>
+                        <div id="res-band" class="text-2xl font-extrabold text-blue-700 mt-1">0.0</div>
+                    </div>
+                    <div class="bg-slate-50 border border-slate-200 rounded-lg p-3.5 text-center">
+                        <div class="text-xs font-bold text-slate-500 uppercase">Time Spent</div>
+                        <div id="res-time" class="text-2xl font-extrabold text-slate-900 mt-1">00:00</div>
+                    </div>
+                </div>
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500">Answer Sheet & Key Comparison (Click any item to jump to question)</h3>
+                        <span id="key-warning-badge" class="hidden text-xs text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">No Answer Key found in PDF — showing your recorded answers</span>
+                    </div>
+                    <div id="res-details-list" class="grid grid-cols-1 md:grid-cols-2 gap-2"></div>
+                </div>
+            </div>
+            <div class="px-6 py-3 bg-slate-100 border-t border-slate-200 flex justify-end space-x-2">
+                <button onclick="openSetupScreen(); closeResultModal();" class="px-4 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs rounded">Upload Another PDF</button>
+                <button onclick="closeResultModal()" class="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded">Review in Test View</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // =========================================================================
+        // STATE MANAGEMENT
+        // =========================================================================
+        let examData = null;
+        let currentPart = 1;
+        let currentQuestionId = 1;
+        let userAnswers = {};
+        let reviewFlags = {};
+        let savedPassageHtml = {};
+        let savedQuestionsHtml = {};
+        let notesRegistry = {}; // highlightId -> { partId, text, note, color }
+
+        let initialTimerSeconds = 3600;
+        let timerSeconds = 3600;
+        let timerInterval = null;
+        let isTimerVisible = true;
+        let isUntimed = false;
+
+        // Restore saved API key if any
+        window.addEventListener('DOMContentLoaded', () => {
+            const savedKey = localStorage.getItem('ielts_gemini_key');
+            if (savedKey) document.getElementById('gemini-api-key').value = savedKey;
+            setupDragAndDrop();
+            setupResizer();
+            setupTextSelection();
+        });
+
+        function setupDragAndDrop() {
+            const dz = document.getElementById('drop-zone');
+            dz.addEventListener('dragover', (e) => { e.preventDefault(); dz.classList.add('border-blue-600', 'bg-blue-50/40'); });
+            dz.addEventListener('dragleave', () => dz.classList.remove('border-blue-600', 'bg-blue-50/40'));
+            dz.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dz.classList.remove('border-blue-600', 'bg-blue-50/40');
+                if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                    const input = document.getElementById('pdf-file-input');
+                    input.files = e.dataTransfer.files;
+                    handleFileSelect({ target: input });
+                }
+            });
+        }
+
+        // =========================================================================
+        // UNIVERSAL PDF SCANNER (IGNORES WATERMARKS/FOOTNOTES & HANDLES ANY LAYOUT)
+        // =========================================================================
+        async function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            document.getElementById('file-name-display').textContent = file.name;
+            const statusEl = document.getElementById('parse-status');
+            const startBtn = document.getElementById('start-test-btn');
+            statusEl.className = "mt-2.5 text-xs font-semibold rounded-lg px-3 py-2 border bg-blue-50 text-blue-700 border-blue-200";
+            statusEl.textContent = `Scanning "${file.name}" — Filtering watermarks/footnotes and reconstructing layout...`;
+            statusEl.classList.remove('hidden');
+            startBtn.disabled = true;
+
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const rawPages = await extractSpatialLinesFromPdf(arrayBuffer);
+                const cleanedPages = stripWatermarksAndFootnotes(rawPages);
+
+                const apiKey = document.getElementById('gemini-api-key').value.trim();
+                let parsedExam = null;
+
+                // 1. Run Deterministic Universal Layout-Agnostic Parser first
+                parsedExam = universalParseIeltsPdf(cleanedPages, file.name.replace(/\.pdf$/i, ''));
+
+                // 2. If user provided a Gemini API key and local parser missed questions, refine with Gemini
+                if (apiKey && countTotalQuestions(parsedExam) < 25) {
+                    statusEl.textContent = `Enhancing complex PDF layout with Gemini AI...`;
+                    const aiParsed = await parseWithGeminiApi(cleanedPages, apiKey, file.name.replace(/\.pdf$/i, ''));
+                    if (aiParsed && countTotalQuestions(aiParsed) > countTotalQuestions(parsedExam)) {
+                        parsedExam = aiParsed;
+                    }
+                }
+
+                examData = parsedExam;
+                const totalQs = countTotalQuestions(examData);
+                const totalKeys = countTotalKeys(examData);
+
+                statusEl.className = "mt-2.5 text-xs font-semibold rounded-lg px-3 py-2 border bg-emerald-50 text-emerald-800 border-emerald-200";
+                statusEl.textContent = `✓ Scanned "${examData.title}": ${examData.parts.length} Passages, ${totalQs} Questions, and ${totalKeys} Answer Keys extracted.`;
+
+                startBtn.disabled = false;
+                startBtn.className = "w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-lg shadow transition-all cursor-pointer";
+                startBtn.textContent = "Start IELTS Reading Test";
+            } catch (err) {
+                console.error("PDF Scan Error:", err);
+                statusEl.className = "mt-2.5 text-xs font-semibold rounded-lg px-3 py-2 border bg-rose-50 text-rose-700 border-rose-200";
+                statusEl.textContent = `Error reading PDF: ${err.message || 'Invalid or encrypted PDF file.'}`;
+            }
+        }
+
+        // Spatial PDF Line Reconstruction using X/Y coordinates
+        async function extractSpatialLinesFromPdf(arrayBuffer) {
+            const pdf = await pdfjsLib.getDocument(new Uint8Array(arrayBuffer)).promise;
+            const pages = [];
+
+            for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                const page = await pdf.getPage(pageNum);
+                const viewport = page.getViewport({ scale: 1.0 });
+                const textContent = await page.getTextContent();
+
+                // Group text items by Y coordinate (tolerance 4px)
+                const rows = [];
+                for (const item of textContent.items) {
+                    const str = item.str;
+                    if (!str || !str.trim()) continue;
+                    const x = item.transform[4];
+                    const y = item.transform[5];
+
+                    // Ignore extreme top/bottom 3.5% margin footnotes/page numbers
+                    if (y < viewport.height * 0.035 || y > viewport.height * 0.965) continue;
+
+                    let row = rows.find(r => Math.abs(r.y - y) <= 4.5);
+                    if (!row) {
+                        row = { y, items: [] };
+                        rows.push(row);
+                    }
+                    row.items.push({ x, str: str });
+                }
+
+                // Sort top-to-bottom, then left-to-right
+                rows.sort((a, b) => b.y - a.y);
+                const pageLines = rows.map(r => {
+                    r.items.sort((a, b) => a.x - b.x);
+                    let line = '';
+                    let lastX = null;
+                    for (const it of r.items) {
+                        if (lastX !== null && it.x - lastX > 12) line += ' ';
+                        line += it.str;
+                        lastX = it.x + (it.str.length * 4.5);
+                    }
+                    return line.replace(/\s+/g, ' ').trim();
+                }).filter(Boolean);
+
+                pages.push(pageLines);
+            }
+            return pages;
+        }
+
+        // Watermark, Header, Footer, and OCR Noise Filter
+        function stripWatermarksAndFootnotes(pages) {
+            // Count line frequency across pages to detect repeating headers/footers
+            const lineFreq = {};
+            pages.forEach(lines => {
+                const uniqueOnPage = new Set(lines.map(l => l.toLowerCase().trim()));
+                uniqueOnPage.forEach(l => {
+                    if (l.length > 3) lineFreq[l] = (lineFreq[l] || 0) + 1;
+                });
+            });
+
+            const minRepeat = Math.max(3, Math.floor(pages.length * 0.35));
+
+            const noisePatterns = [
+                /true\s*ielts/i,
+                /trueielts\.vn/i,
+                /zalo\s*[:\-]?\s*\d+/i,
+                /dự\s*đoán\s*đề\s*thi/i,
+                /^(?:true|ielts|telts|felts|helts|tielts|tdlic|tdie|ftis|ftelts|theelts|eets|tru|trup|syste)$/i,
+                /^page\s+\d+(?:\s+of\s+\d+)?$/i,
+                /^\d{1,2}$/, // isolated page numbers
+                /https?:\/\/\S+/i,
+                /www\.\S+/i,
+                /^cambridge\s+ielts/i
+            ];
+
+            return pages.map(lines => {
+                return lines.filter(line => {
+                    const clean = line.trim();
+                    if (!clean) return false;
+                    // Strip known watermark/noise patterns
+                    for (const pat of noisePatterns) {
+                        if (pat.test(clean)) return false;
+                    }
+                    // Strip lines that repeat on >= 35% of pages (headers/footers) unless they are standard IELTS instructions
+                    const lower = clean.toLowerCase();
+                    if (lineFreq[lower] >= minRepeat && !/questions?\s+\d+|reading\s+passage|true|false|not\s+given/i.test(clean)) {
+                        return false;
+                    }
+                    return true;
+                }).map(line => {
+                    // Clean inline watermark fragments stuck at the end of normal lines
+                    return line
+                        .replace(/\b(?:trueielts\.vn|ZALO:\s*[\d.]+|Dự Đoán ĐỀ THI IELTS)\b/gi, '')
+                        .replace(/\s+(?:HELTS|FELTS|TELTS|THELTS|FTELTS|EETS)\b/g, '')
+                        .trim();
+                }).filter(Boolean);
+            });
+        }
+
+        // Universal Layout-Agnostic IELTS Parser
+        function universalParseIeltsPdf(pages, docTitle) {
+            const answerKeys = {};
+            const nonAnswerLines = [];
+
+            // STEP 1: Separate Answer Key pages/sections from Passage + Question lines
+            for (const pageLines of pages) {
+                const pageText = pageLines.join('\n');
+                const isAnswerPage = /(?:^|\n)\s*(?:ĐÁP\s*ÁN|ANSWER\s*KEY|ANSWERS|KEY\s*AND\s*EXPLANATION|READING\s*ANSWER\s*KEY)\s*[:\-]?/i.test(pageText);
+
+                if (isAnswerPage) {
+                    extractKeysFromBlock(pageLines, answerKeys);
+                    // Keep any lines before the ĐÁP ÁN header if they belong to questions
+                    const headerIdx = pageLines.findIndex(l => /^(?:ĐÁP\s*ÁN|ANSWER\s*KEY|ANSWERS)\s*[:\-]?/i.test(l));
+                    if (headerIdx > 2) {
+                        nonAnswerLines.push(...pageLines.slice(0, headerIdx));
+                    }
+                } else {
+                    // Also check if a page without a header is purely a compact answer key table (e.g., 1. TRUE ... 40. B)
+                    const tempKeys = {};
+                    extractKeysFromBlock(pageLines, tempKeys);
+                    if (Object.keys(tempKeys).length >= 12 && pageLines.length < 55 && !/READING\s+PASSAGE/i.test(pageText)) {
+                        Object.assign(answerKeys, tempKeys);
+                    } else {
+                        nonAnswerLines.push(...pageLines);
+                    }
+                }
+            }
+
+            // STEP 2: Split nonAnswerLines into 3 Passages/Parts
+            const partIndices = [];
+            nonAnswerLines.forEach((line, idx) => {
+                if (/^(?:Test\s*\d+\s*[:\-]?\s*)?READING\s+PASSAGE\s+([123])\b/i.test(line) ||
+                    /^SECTION\s+([123])\b/i.test(line)) {
+                    const m = line.match(/([123])/);
+                    const pNum = m ? parseInt(m[1], 10) : partIndices.length + 1;
+                    // Avoid duplicate triggers on the same passage
+                    if (!partIndices.some(p => p.partNum === pNum)) {
+                        partIndices.push({ partNum: pNum, startIdx: idx });
+                    }
+                }
+            });
+
+            const parts = [];
+            if (partIndices.length > 0) {
+                for (let i = 0; i < partIndices.length; i++) {
+                    const start = partIndices[i].startIdx;
+                    const end = (i + 1 < partIndices.length) ? partIndices[i + 1].startIdx : nonAnswerLines.length;
+                    const slice = nonAnswerLines.slice(start, end);
+                    parts.push(parseSinglePassageSlice(slice, partIndices[i].partNum, answerKeys));
+                }
+            } else {
+                // Fallback if PDF doesn't use "READING PASSAGE X" headers
+                parts.push(parseSinglePassageSlice(nonAnswerLines, 1, answerKeys));
+            }
+
+            return {
+                title: docTitle || "IELTS Reading Test",
+                parts: parts
+            };
+        }
+
+        // Extract Answer Keys from any Vietnamese or English format
+        function extractKeysFromBlock(lines, targetKeys) {
+            const fullBlock = lines.join('\n');
+
+            // Pattern A: Combined two-letter keys like "19 & 20. B, D" or "Questions 25 and 26: C, D"
+            const multiRegex = /(\d{1,2})\s*(?:&|and|-)\s*(\d{1,2})[.:)\-\s]+([A-G])\s*[,/&]\s*([A-G])/gi;
+            let m;
+            while ((m = multiRegex.exec(fullBlock)) !== null) {
+                const q1 = parseInt(m[1], 10), q2 = parseInt(m[2], 10);
+                targetKeys[q1] = `${m[3].toUpperCase()} / ${m[4].toUpperCase()}`;
+                targetKeys[q2] = `${m[4].toUpperCase()} / ${m[3].toUpperCase()}`;
+            }
+
+            // Pattern B: "Câu 14: ... -> B" or "Câu 14: ... Siberian polecat"
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+
+                // Format: "14. Section A: vii" or "14. Paragraph A: iv"
+                const secMatch = line.match(/^(\d{1,2})[.:)\-\s]+(?:Section|Paragraph)\s+[A-I]\s*[:\-]\s*(i{1,3}|iv|vi{0,3}|ix|x)\b/i);
+                if (secMatch) {
+                    targetKeys[parseInt(secMatch[1], 10)] = secMatch[2].toLowerCase();
+                    continue;
+                }
+
+                // Format: "Câu 17: ... -> B (1874)" or "Câu 23: ... -> Đoạn E"
+                const cauArrow = line.match(/^Câu\s+(\d{1,2})\b.*?(?:→|->)\s*(?:Đoạn\s+)?([A-J]|TRUE|FALSE|NOT GIVEN|YES|NO)\b/i);
+                if (cauArrow) {
+                    targetKeys[parseInt(cauArrow[1], 10)] = cauArrow[2].toUpperCase();
+                    continue;
+                }
+
+                // Standard numbered answer line: "1. TRUE", "8. investment", "13. pesticide (hoặc fertiliser)", "24. ageing (hoặc aging)"
+                const stdMatch = line.match(/^[•\-\s]*(\d{1,2})\s*[.:)\-]\s*([^\n]+)/);
+                if (stdMatch) {
+                    const qNum = parseInt(stdMatch[1], 10);
+                    if (qNum >= 1 && qNum <= 40 && !targetKeys[qNum]) {
+                        let rawAns = stdMatch[2].trim();
+
+                        // Check for "(hoặc ...)" or "(or ...)" alternative before stripping explanations
+                        const altMatch = rawAns.match(/^([a-zA-Z0-9\s\-]+?)\s*\((?:hoặc|or)\s+([a-zA-Z0-9\s\-]+?)\)/i);
+                        if (altMatch) {
+                            targetKeys[qNum] = `${altMatch[1].trim()} / ${altMatch[2].trim()}`;
+                            continue;
+                        }
+
+                        // Strip Vietnamese/English explanation in parentheses or after dash
+                        rawAns = rawAns
+                            .replace(/\s*\(.*$/, '')
+                            .replace(/\s+[–—\-:]\s+.*$/, '')
+                            .trim();
+
+                        // Validate extracted token
+                        const tfMatch = rawAns.match(/^(TRUE|FALSE|NOT\s+GIVEN|YES|NO)\b/i);
+                        if (tfMatch) {
+                            targetKeys[qNum] = tfMatch[1].toUpperCase().replace(/\s+/g, ' ');
+                        } else if (/^(i{1,3}|iv|vi{0,3}|ix|x)$/i.test(rawAns)) {
+                            targetKeys[qNum] = rawAns.toLowerCase();
+                        } else if (/^[A-K]$/i.test(rawAns)) {
+                            targetKeys[qNum] = rawAns.toUpperCase();
+                        } else if (rawAns.length >= 1 && rawAns.length <= 32 && !/^(Đoạn|Giải thích|Location|Explanation)/i.test(rawAns)) {
+                            targetKeys[qNum] = rawAns.replace(/[.,;:]$/, '').trim();
+                        }
+                    }
+                }
+            }
+        }
+
+        // Parse a single Passage slice into { id, title, instructions, content, questions, answers }
+        function parseSinglePassageSlice(lines, partId, allAnswerKeys) {
+            const defaultMinQ = partId === 1 ? 1 : (partId === 2 ? 14 : 27);
+            const defaultMaxQ = partId === 1 ? 13 : (partId === 2 ? 26 : 40);
+
+            // Locate where the main Question blocks begin (after the passage, or before the passage for List of Headings)
+            let firstQuestionBlockIdx = -1;
+            let passageStartIdx = 0;
+
+            // Find all "Questions X-Y" headers
+            const qHeaderIndices = [];
+            lines.forEach((l, idx) => {
+                if (/^Questions?\s+\d{1,2}(?:\s*[\-–—toand&]+\s*\d{1,2})?/i.test(l) && !/based on Reading Passage/i.test(l)) {
+                    qHeaderIndices.push(idx);
+                }
+            });
+
+            // Determine if there is a "List of Headings" block BEFORE the passage text
+            let preQuestionLines = [];
+            let postQuestionLines = [];
+            let passageLines = [];
+
+            if (qHeaderIndices.length > 0) {
+                const firstQIdx = qHeaderIndices[0];
+                // Check if the first Question header is right at the top (e.g. List of Headings before Passage 2)
+                if (firstQIdx <= 4 && qHeaderIndices.length >= 2) {
+                    const secondQIdx = qHeaderIndices[1];
+                    // Find where the heading questions end (e.g. after "18 Section E" or "19 Paragraph F")
+                    let headingBlockEnd = firstQIdx + 1;
+                    for (let k = firstQIdx + 1; k < secondQIdx; k++) {
+                        if (/^\d{1,2}\s+(?:Section|Paragraph)\s+[A-I]\b/i.test(lines[k])) {
+                            headingBlockEnd = k + 1;
+                        }
+                    }
+                    preQuestionLines = lines.slice(firstQIdx, headingBlockEnd);
+                    passageLines = lines.slice(headingBlockEnd, secondQIdx);
+                    postQuestionLines = lines.slice(secondQIdx);
+                } else {
+                    passageLines = lines.slice(0, firstQIdx);
+                    postQuestionLines = lines.slice(firstQIdx);
+                }
+            } else {
+                passageLines = lines;
+            }
+
+            // Extract passage title & clean passage paragraphs
+            let title = `Reading Passage ${partId}`;
+            const cleanedPassageLines = [];
+            for (const l of passageLines) {
+                if (/^READING\s+PASSAGE\s+\d/i.test(l) || /^You should spend about/i.test(l) || /^Test\s+\d/i.test(l)) continue;
+                if (title === `Reading Passage ${partId}` && l.length > 3 && l.length < 95 && !/[.?!]$/.test(l)) {
+                    title = l;
+                    continue;
+                }
+                cleanedPassageLines.push(l);
+            }
+
+            // Group passage lines into paragraphs
+            const paragraphs = [];
+            let currPara = "";
+            for (const l of cleanedPassageLines) {
+                if (/^[A-I]\s+[A-Z]/.test(l) || /^[A-I]$/.test(l)) {
+                    if (currPara) paragraphs.push(currPara);
+                    currPara = l;
+                } else if (currPara && /[.!?”"']$/.test(currPara) && l.length > 40 && /^[A-Z“"']/.test(l)) {
+                    paragraphs.push(currPara);
+                    currPara = l;
+                } else {
+                    currPara = currPara ? `${currPara} ${l}` : l;
+                }
+            }
+            if (currPara) paragraphs.push(currPara);
+
+            const contentHtml = paragraphs.map(p => `<p>${p}</p>`).join('\n');
+
+            // Parse Question Groups from [preQuestionLines + postQuestionLines]
+            const allQLines = [...preQuestionLines, ...postQuestionLines];
+            const questions = parseQuestionsFromLines(allQLines, defaultMinQ, defaultMaxQ);
+
+            // Map answers for this part
+            const partAnswers = {};
+            questions.forEach(q => {
+                if (allAnswerKeys[q.id]) partAnswers[q.id] = allAnswerKeys[q.id];
+            });
+
+            return {
+                id: partId,
+                title,
+                instructions: `Questions ${defaultMinQ}–${defaultMaxQ}`,
+                content: contentHtml || `<p>Passage content extracted from PDF.</p>`,
+                questions,
+                answers: partAnswers
+            };
+        }
+
+        // Parse Question Blocks into Interactive Question Objects
+        function parseQuestionsFromLines(lines, minQ, maxQ) {
+            const questions = [];
+            if (!lines || lines.length === 0) {
+                for (let i = minQ; i <= maxQ; i++) {
+                    questions.push({ id: i, type: 'fill', prompt: `Question ${i}: ________` });
+                }
+                return questions;
+            }
+
+            // Split by "Questions X-Y" or "Question 40"
+            const blocks = [];
+            let currentBlock = [];
+            for (const l of lines) {
+                if (/^Questions?\s+\d{1,2}/i.test(l) && currentBlock.length > 0) {
+                    blocks.push(currentBlock);
+                    currentBlock = [l];
+                } else {
+                    currentBlock.push(l);
+                }
+            }
+            if (currentBlock.length > 0) blocks.push(currentBlock);
+
+            for (const block of blocks) {
+                const blockText = block.join('\n');
+                const headerLine = block[0] || '';
+                const rangeMatch = headerLine.match(/Questions?\s+(\d{1,2})(?:\s*(?:[\-–—]|to|and|&)\s*(\d{1,2}))?/i);
+                const startQ = rangeMatch ? parseInt(rangeMatch[1], 10) : minQ;
+                const endQ = (rangeMatch && rangeMatch[2]) ? parseInt(rangeMatch[2], 10) : startQ;
+
+                // Determine block question type
+                let qType = 'fill';
+                let selectOptions = ['A','B','C','D','E','F','G','H','I'];
+
+                if (/TRUE[\s\S]{1,120}FALSE[\s\S]{1,120}NOT\s+GIVEN/i.test(blockText)) {
+                    qType = 'tfng';
+                } else if (/YES[\s\S]{1,120}NO[\s\S]{1,120}NOT\s+GIVEN/i.test(blockText)) {
+                    qType = 'yes_no';
+                } else if (/List of Headings/i.test(blockText) || /correct number,\s*i[\-–—]v/i.test(blockText)) {
+                    qType = 'select';
+                    selectOptions = ['i','ii','iii','iv','v','vi','vii','viii','ix','x'];
+                } else if (/Choose TWO letters/i.test(blockText)) {
+                    qType = 'select';
+                    selectOptions = ['A','B','C','D','E'];
+                } else if (/Choose the correct letter,\s*A,\s*B,\s*C\s*or\s*D/i.test(blockText)) {
+                    qType = 'mcq';
+                } else if (/Which paragraph contains|correct letter,\s*A[\-–—][A-Z]/i.test(blockText) || /Match each|list of words/i.test(blockText)) {
+                    qType = 'select';
+                    const letterRange = blockText.match(/A[\-–—]([E-K])/);
+                    const lastChar = letterRange ? letterRange[1] : 'I';
+                    selectOptions = [];
+                    for (let c = 65; c <= lastChar.charCodeAt(0); c++) selectOptions.push(String.fromCharCode(c));
+                }
+
+                // Build group instruction banner
+                const instructionLines = [];
+                for (const l of block) {
+                    if (/^(?:Questions?|Do the following|In boxes|Complete the|Choose |Write |Reading Passage|Which paragraph|Look at the|Match each|NB |List of )/i.test(l) ||
+                        /^(?:[A-K]|\b(?:i{1,3}|iv|vi{0,3}|ix)\b)\s+[A-Z]/.test(l)) {
+                        instructionLines.push(l);
+                    }
+                }
+                const groupTitle = instructionLines.slice(0, 6).join(' — ');
+
+                if (qType === 'mcq') {
+                    // Extract MCQs with A/B/C/D options
+                    for (let qNum = startQ; qNum <= endQ; qNum++) {
+                        const qRegex = new RegExp(`(?:^|\\n)\\s*${qNum}\\.?\\s+([^\\n]+)`, 'm');
+                        const qMatch = blockText.match(qRegex);
+                        const promptText = qMatch ? `${qNum}. ${qMatch[1].trim()}` : `Question ${qNum}`;
+                        const opts = ['A', 'B', 'C', 'D'];
+                        questions.push({
+                            id: qNum,
+                            groupTitle: qNum === startQ ? groupTitle : null,
+                            type: 'mcq',
+                            prompt: promptText,
+                            options: opts
+                        });
+                    }
+                } else if (qType === 'tfng' || qType === 'yes_no' || qType === 'select') {
+                    for (let qNum = startQ; qNum <= endQ; qNum++) {
+                        const qRegex = new RegExp(`(?:^|\\n)\\s*${qNum}\\.?\\s+([^\\n]+)`, 'm');
+                        const qMatch = blockText.match(qRegex);
+                        const promptText = qMatch ? `${qNum}. ${qMatch[1].trim()}` : `Question ${qNum}`;
+                        questions.push({
+                            id: qNum,
+                            groupTitle: qNum === startQ ? groupTitle : null,
+                            type: qType,
+                            options: selectOptions,
+                            prompt: promptText
+                        });
+                    }
+                } else {
+                    // Gap-fill / Summary / Notes completion (handles missing vector lines)
+                    for (let qNum = startQ; qNum <= endQ; qNum++) {
+                        const qRegex = new RegExp(`([^\\n.]*?\\b${qNum}\\b[._\\s]*[^\\n.]*)`, 'm');
+                        const m = blockText.match(qRegex);
+                        let promptText = m ? m[1].trim() : `Question ${qNum}: ________`;
+                        // Replace standalone question number with inline blank marker
+                        promptText = promptText.replace(new RegExp(`\\b${qNum}\\b[._\\s]*`), `(${qNum}) ________ `);
+                        if (!promptText.includes('________')) promptText += ' ________';
+                        questions.push({
+                            id: qNum,
+                            groupTitle: qNum === startQ ? groupTitle : null,
+                            type: 'fill',
+                            prompt: promptText
+                        });
+                    }
+                }
+            }
+
+            // Ensure questions are sorted and deduplicated
+            const map = new Map();
+            questions.forEach(q => { if (q.id >= 1 && q.id <= 40) map.set(q.id, q); });
+            return Array.from(map.values()).sort((a, b) => a.id - b.id);
+        }
+
+        function countTotalQuestions(data) {
+            if (!data || !data.parts) return 0;
+            return data.parts.reduce((acc, p) => acc + (p.questions ? p.questions.length : 0), 0);
+        }
+
+        function countTotalKeys(data) {
+            if (!data || !data.parts) return 0;
+            return data.parts.reduce((acc, p) => acc + (p.answers ? Object.keys(p.answers).length : 0), 0);
+        }
+
+        // Optional Gemini API Enhancer for irregular/scanned PDFs
+        async function parseWithGeminiApi(cleanedPages, apiKey, title) {
+            try {
+                const rawText = cleanedPages.map((p, idx) => `--- PAGE ${idx + 1} ---\n${p.join('\n')}`).join('\n\n');
+                const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [{
+                                text: `You are an IELTS Reading PDF parser. Ignore all watermarks and footnotes. Extract all 3 Reading Passages, all 40 questions (use "________" for blanks in fill questions), and all answer keys (1-40) into JSON matching this exact structure:
+{
+  "title": "${title}",
+  "parts": [
+    {
+      "id": 1,
+      "title": "Passage Title",
+      "instructions": "Questions 1-13",
+      "content": "<p>Paragraph 1...</p><p>Paragraph 2...</p>",
+      "questions": [
+        { "id": 1, "groupTitle": "Instructions...", "type": "tfng|yes_no|mcq|select|fill", "options": ["A","B","C","D"], "prompt": "1. Statement or sentence with ________" }
+      ],
+      "answers": { "1": "TRUE" }
+    }
+  ]
+}
+
+PDF TEXT:
+${rawText.slice(0, 90000)}`
+                            }]
+                        }],
+                        generationConfig: { responseMimeType: "application/json" }
+                    })
+                });
+                const json = await resp.json();
+                const text = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+                return text ? JSON.parse(text) : null;
+            } catch (e) {
+                console.warn("Gemini API fallback skipped:", e);
+                return null;
+            }
+        }
+
+        // =========================================================================
+        // EXAM UI & NAVIGATION
+        // =========================================================================
+        function setTimerPreset(mins) {
+            clearPresetHighlight();
+            const btn = document.getElementById(`preset-${mins}`);
+            if (btn) {
+                btn.classList.add('bg-blue-600', 'text-white', 'border-blue-600');
+                btn.classList.remove('border-slate-300', 'text-slate-800');
+            }
+            document.getElementById('custom-minutes-input').value = mins;
+        }
+
+        function clearPresetHighlight() {
+            [20, 40, 60, 0].forEach(m => {
+                const b = document.getElementById(`preset-${m}`);
+                if (b) {
+                    b.classList.remove('bg-blue-600', 'text-white', 'border-blue-600');
+                    b.classList.add('border-slate-300', 'text-slate-800');
+                }
+            });
+        }
+
+        function openSetupScreen() {
+            document.getElementById('setup-screen').classList.remove('hidden');
+        }
+
+        function startExam() {
+            if (!examData || !examData.parts || examData.parts.length === 0) return;
+
+            userAnswers = {};
+            reviewFlags = {};
+            savedPassageHtml = {};
+            savedQuestionsHtml = {};
+            notesRegistry = {};
+            updateNotesDrawer();
+
+            const mins = parseInt(document.getElementById('custom-minutes-input').value, 10);
+            if (isNaN(mins) || mins <= 0) {
+                isUntimed = true;
+                initialTimerSeconds = 0;
+                timerSeconds = 0;
+            } else {
+                isUntimed = false;
+                initialTimerSeconds = mins * 60;
+                timerSeconds = mins * 60;
+            }
+
+            currentPart = examData.parts[0].id;
+            currentQuestionId = examData.parts[0]?.questions?.[0]?.id || 1;
+
+            document.getElementById('setup-screen').classList.add('hidden');
+            document.getElementById('exam-app').classList.remove('hidden');
+
+            renderPartTabs();
+            renderPart();
+            renderBottomNav();
+            startTimer();
+        }
+
+        function renderPartTabs() {
+            const container = document.getElementById('part-tabs-container');
+            container.innerHTML = '';
+            examData.parts.forEach(p => {
+                const btn = document.createElement('button');
+                btn.id = `part-btn-${p.id}`;
+                btn.onclick = () => switchPart(p.id);
+                btn.className = p.id === currentPart
+                    ? "px-3 py-1 text-xs font-bold rounded bg-blue-600 text-white"
+                    : "px-3 py-1 text-xs font-bold rounded bg-slate-800 text-slate-300 hover:text-white";
+                btn.textContent = `Part ${p.id}`;
+                container.appendChild(btn);
+            });
+        }
+
+        function saveCurrentPartDom() {
+            const pEl = document.getElementById('passage-content');
+            if (pEl && pEl.innerHTML.trim()) {
+                savedPassageHtml[currentPart] = pEl.innerHTML;
+            }
+        }
+
+        function switchPart(partId) {
+            saveCurrentPartDom();
+            currentPart = partId;
+            renderPartTabs();
+            renderPart();
+            renderBottomNav();
+        }
+
+        function renderPart() {
+            const part = examData.parts.find(p => p.id === currentPart) || examData.parts[0];
+            if (!part) return;
+
+            document.getElementById('sub-header-left').textContent = `Part ${part.id}: ${part.title}`;
+            document.getElementById('sub-header-right').textContent = part.instructions || '';
+            document.getElementById('passage-title').textContent = part.title;
+
+            const passageEl = document.getElementById('passage-content');
+            passageEl.innerHTML = savedPassageHtml[part.id] || part.content;
+
+            const qContainer = document.getElementById('questions-container');
+            qContainer.innerHTML = '';
+
+            part.questions.forEach(q => {
+                if (q.groupTitle) {
+                    const banner = document.createElement('div');
+                    banner.className = "group-banner p-3 bg-slate-100 border-l-4 border-blue-600 text-xs font-semibold text-slate-800 rounded-r leading-relaxed";
+                    banner.textContent = q.groupTitle;
+                    qContainer.appendChild(banner);
+                }
+
+                const card = document.createElement('div');
+                card.className = "q-card p-3.5 border border-slate-200 rounded-lg space-y-2 transition-all bg-white text-slate-900";
+                card.id = `q-card-${q.id}`;
+                card.onclick = () => setActiveQuestion(q.id);
+
+                // High-contrast Question Number Badge
+                const qBadge = `<span class="inline-flex items-center justify-center px-2 py-0.5 mr-2 text-xs font-extrabold rounded bg-blue-600 text-white">${q.id}</span>`;
+
+                if (q.type === 'fill') {
+                    const val = (userAnswers[q.id] || '').replace(/"/g, '&quot;');
+                    const cleanPrompt = q.prompt.replace(new RegExp(`^${q.id}\\.?\\s*`), '');
+                    const inlineHtml = cleanPrompt.replace(
+                        '________',
+                        `<input type="text" value="${val}" placeholder="Answer ${q.id}" oninput="saveAnswer(${q.id}, this.value)" class="px-2.5 py-1 border border-slate-400 rounded text-xs font-bold w-40 mx-1 bg-white text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none">`
+                    );
+                    card.innerHTML = `<div class="text-xs font-medium leading-relaxed">${qBadge}${inlineHtml}</div>`;
+                } else if (q.type === 'tfng' || q.type === 'yes_no') {
+                    const opts = q.type === 'tfng' ? ['TRUE', 'FALSE', 'NOT GIVEN'] : ['YES', 'NO', 'NOT GIVEN'];
+                    const cleanPrompt = q.prompt.replace(new RegExp(`^${q.id}\\.?\\s*`), '');
+                    const radios = opts.map(o => `
+                        <label class="inline-flex items-center space-x-1.5 mr-5 cursor-pointer text-xs font-bold">
+                            <input type="radio" name="q_${q.id}" value="${o}" ${userAnswers[q.id] === o ? 'checked' : ''} onchange="saveAnswer(${q.id}, '${o}')">
+                            <span>${o}</span>
+                        </label>
+                    `).join('');
+                    card.innerHTML = `
+                        <div class="text-xs font-semibold leading-relaxed">${qBadge}${cleanPrompt}</div>
+                        <div class="pt-1 pl-7">${radios}</div>
+                    `;
+                } else if (q.type === 'mcq') {
+                    const cleanPrompt = q.prompt.replace(new RegExp(`^${q.id}\\.?\\s*`), '');
+                    const optsHtml = (q.options || ['A','B','C','D']).map(opt => {
+                        const letter = opt.charAt(0);
+                        return `
+                            <label class="flex items-center space-x-2 cursor-pointer text-xs py-1 px-2 rounded hover:bg-slate-100">
+                                <input type="radio" name="q_${q.id}" value="${letter}" ${userAnswers[q.id] === letter ? 'checked' : ''} onchange="saveAnswer(${q.id}, '${letter}')">
+                                <span class="font-medium">${opt}</span>
+                            </label>
+                        `;
+                    }).join('');
+                    card.innerHTML = `
+                        <div class="text-xs font-semibold leading-relaxed">${qBadge}${cleanPrompt}</div>
+                        <div class="space-y-1 pt-1 pl-5">${optsHtml}</div>
+                    `;
+                } else {
+                    const cleanPrompt = q.prompt.replace(new RegExp(`^${q.id}\\.?\\s*`), '');
+                    const optsHtml = (q.options || ['A','B','C','D','E','F','G','H']).map(o => `<option value="${o}" ${userAnswers[q.id] === o ? 'selected' : ''}>${o}</option>`).join('');
+                    card.innerHTML = `
+                        <div class="flex items-center justify-between gap-3">
+                            <span class="text-xs font-medium leading-relaxed">${qBadge}${cleanPrompt}</span>
+                            <select onchange="saveAnswer(${q.id}, this.value)" class="px-2.5 py-1 border border-slate-400 rounded text-xs font-bold bg-white text-slate-900 shrink-0">
+                                <option value="">Select</option>
+                                ${optsHtml}
+                            </select>
+                        </div>
+                    `;
+                }
+
+                qContainer.appendChild(card);
+            });
+        }
+
+        function setActiveQuestion(qId) {
+            currentQuestionId = qId;
+            document.getElementById('review-current-checkbox').checked = !!reviewFlags[qId];
+            renderBottomNav();
+        }
+
+        function toggleCurrentQuestionReview(checked) {
+            reviewFlags[currentQuestionId] = checked;
+            renderBottomNav();
+        }
+
+        function saveAnswer(qId, value) {
+            currentQuestionId = qId;
+            userAnswers[qId] = value;
+            renderBottomNav();
+        }
+
+        // High-Contrast Bottom Question Bar
+        function renderBottomNav() {
+            const nav = document.getElementById('bottom-nav-questions');
+            nav.innerHTML = '';
+            if (!examData || !examData.parts) return;
+
+            const allQs = [];
+            examData.parts.forEach(p => p.questions.forEach(q => allQs.push({ id: q.id, partId: p.id })));
+
+            allQs.forEach(({ id, partId }) => {
+                const answered = userAnswers[id] && String(userAnswers[id]).trim() !== '';
+                const reviewed = !!reviewFlags[id];
+                const isCurrent = id === currentQuestionId;
+
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'nav-q-btn';
+                if (answered) btn.classList.add('answered');
+                if (reviewed) btn.classList.add('reviewed');
+                if (isCurrent) btn.classList.add('current');
+
+                btn.textContent = id;
+                btn.onclick = () => jumpToQuestion(id, partId);
+                nav.appendChild(btn);
+            });
+        }
+
+        function jumpToQuestion(qId, partId) {
+            currentQuestionId = qId;
+            const targetPart = partId || (qId <= 13 ? 1 : (qId <= 26 ? 2 : 3));
+            if (currentPart !== targetPart) switchPart(targetPart);
+            setTimeout(() => {
+                const card = document.getElementById(`q-card-${qId}`);
+                if (card) {
+                    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    setActiveQuestion(qId);
+                }
+            }, 50);
+        }
+
+        // =========================================================================
+        // 5-COLOR HIGHLIGHTER & STICKY NOTE SYSTEM
+        // =========================================================================
+        let savedRange = null;
+        let activeHighlightEl = null;
+
+        function setupTextSelection() {
+            document.addEventListener('mouseup', (e) => {
+                const toolbar = document.getElementById('float-toolbar');
+                const popover = document.getElementById('note-popover');
+                if (toolbar.contains(e.target) || popover.contains(e.target)) return;
+
+                // Click on an existing highlight
+                const hlNode = e.target.closest('[data-hl-id]');
+                if (hlNode) {
+                    openNotePopoverForElement(hlNode, e.clientX, e.clientY);
+                    return;
+                }
+
+                const sel = window.getSelection();
+                const text = sel.toString().trim();
+                const inLeft = document.getElementById('left-pane')?.contains(sel.anchorNode);
+                const inRight = document.getElementById('right-pane')?.contains(sel.anchorNode);
+
+                if (text.length > 0 && (inLeft || inRight)) {
+                    savedRange = sel.getRangeAt(0).cloneRange();
+                    toolbar.style.top = `${Math.max(12, e.clientY - 46)}px`;
+                    toolbar.style.left = `${Math.min(window.innerWidth - 220, Math.max(12, e.clientX - 60))}px`;
+                    toolbar.classList.remove('hidden');
+                } else {
+                    toolbar.classList.add('hidden');
+                }
+            });
+        }
+
+        function applyHighlight(colorClass, openNoteAfter = false) {
+            if (!savedRange) return null;
+            const hlId = 'hl_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+            const span = document.createElement('span');
+            span.className = colorClass;
+            span.setAttribute('data-hl-id', hlId);
+            const selectedText = savedRange.toString().trim();
+
+            try {
+                const fragment = savedRange.extractContents();
+                span.appendChild(fragment);
+                savedRange.insertNode(span);
+            } catch (err) {
+                console.warn('Highlight wrap warning:', err);
+            }
+
+            notesRegistry[hlId] = {
+                partId: currentPart,
+                text: selectedText.slice(0, 120),
+                note: '',
+                color: colorClass
+            };
+
+            saveCurrentPartDom();
+            updateNotesDrawer();
+            document.getElementById('float-toolbar').classList.add('hidden');
+            window.getSelection().removeAllRanges();
+            savedRange = null;
+
+            if (openNoteAfter) {
+                const rect = span.getBoundingClientRect();
+                openNotePopoverForElement(span, rect.left, rect.bottom);
+            }
+            return span;
+        }
+
+        function openNotePopoverForSelection() {
+            applyHighlight('hl-yellow', true);
+        }
+
+        function openNotePopoverForElement(el, x, y) {
+            activeHighlightEl = el;
+            const hlId = el.getAttribute('data-hl-id');
+            const entry = notesRegistry[hlId] || { note: '' };
+            document.getElementById('note-textarea').value = entry.note || '';
+
+            const popover = document.getElementById('note-popover');
+            popover.style.top = `${Math.min(window.innerHeight - 190, Math.max(12, y + 10))}px`;
+            popover.style.left = `${Math.min(window.innerWidth - 300, Math.max(12, x - 40))}px`;
+            popover.classList.remove('hidden');
+            document.getElementById('float-toolbar').classList.add('hidden');
+        }
+
+        function changeActiveHighlightColor(newColor) {
+            if (!activeHighlightEl) return;
+            const hlId = activeHighlightEl.getAttribute('data-hl-id');
+            ['hl-yellow','hl-green','hl-blue','hl-pink','hl-orange'].forEach(c => activeHighlightEl.classList.remove(c));
+            activeHighlightEl.classList.add(newColor);
+            if (notesRegistry[hlId]) notesRegistry[hlId].color = newColor;
+            saveCurrentPartDom();
+            updateNotesDrawer();
+        }
+
+        function saveActiveNote() {
+            if (!activeHighlightEl) return;
+            const hlId = activeHighlightEl.getAttribute('data-hl-id');
+            const val = document.getElementById('note-textarea').value.trim();
+            if (!notesRegistry[hlId]) {
+                notesRegistry[hlId] = { partId: currentPart, text: activeHighlightEl.textContent.slice(0, 120), note: val, color: 'hl-yellow' };
+            } else {
+                notesRegistry[hlId].note = val;
+            }
+            if (val) {
+                activeHighlightEl.classList.add('has-note');
+                activeHighlightEl.title = val;
+            } else {
+                activeHighlightEl.classList.remove('has-note');
+                activeHighlightEl.removeAttribute('title');
+            }
+            saveCurrentPartDom();
+            updateNotesDrawer();
+            closeNotePopover();
+        }
+
+        function removeActiveHighlight() {
+            if (!activeHighlightEl) return;
+            const hlId = activeHighlightEl.getAttribute('data-hl-id');
+            const parent = activeHighlightEl.parentNode;
+            while (activeHighlightEl.firstChild) parent.insertBefore(activeHighlightEl.firstChild, activeHighlightEl);
+            parent.removeChild(activeHighlightEl);
+            delete notesRegistry[hlId];
+            saveCurrentPartDom();
+            updateNotesDrawer();
+            closeNotePopover();
+        }
+
+        function closeNotePopover() {
+            document.getElementById('note-popover').classList.add('hidden');
+            activeHighlightEl = null;
+        }
+
+        function toggleNotesDrawer() {
+            document.getElementById('notes-drawer').classList.toggle('hidden');
+        }
+
+        function updateNotesDrawer() {
+            const entries = Object.entries(notesRegistry);
+            document.getElementById('notes-count').textContent = entries.length;
+            const list = document.getElementById('notes-list');
+            if (entries.length === 0) {
+                list.innerHTML = `<p class="text-slate-400 text-center py-6">Select any text to highlight or add a note.</p>`;
+                return;
+            }
+            list.innerHTML = entries.map(([id, item]) => `
+                <div onclick="jumpToHighlight('${id}', ${item.partId})" class="p-2.5 rounded border border-slate-200 hover:border-blue-400 cursor-pointer space-y-1 bg-slate-50">
+                    <div class="flex items-center justify-between text-[10px] font-bold text-slate-500">
+                        <span>PART ${item.partId}</span>
+                        <span class="px-1.5 py-0.5 rounded ${item.color}">Highlight</span>
+                    </div>
+                    <div class="italic text-slate-700 line-clamp-2">"${item.text}"</div>
+                    ${item.note ? `<div class="font-semibold text-blue-700 pt-1">📝 ${item.note}</div>` : ''}
+                </div>
+            `).join('');
+        }
+
+        function jumpToHighlight(hlId, partId) {
+            if (currentPart !== partId) switchPart(partId);
+            setTimeout(() => {
+                const el = document.querySelector(`[data-hl-id="${hlId}"]`);
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 60);
+        }
+
+        // =========================================================================
+        // TIMER, THEME, RESIZER & AUTO-GRADING
+        // =========================================================================
+        function startTimer() {
+            if (timerInterval) clearInterval(timerInterval);
+            updateTimerDisplay();
+            timerInterval = setInterval(() => {
+                if (isUntimed) {
+                    timerSeconds++;
+                    updateTimerDisplay();
+                    return;
+                }
+                if (timerSeconds <= 0) {
+                    clearInterval(timerInterval);
+                    submitAndGradeTest();
+                    return;
+                }
+                timerSeconds--;
+                updateTimerDisplay();
+            }, 1000);
+        }
+
+        function updateTimerDisplay() {
+            const el = document.getElementById('timer-display');
+            const mins = Math.floor(timerSeconds / 60);
+            const secs = timerSeconds % 60;
+            el.textContent = (isUntimed ? "Elapsed " : "") + `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        }
+
+        function toggleTimerVisibility() {
+            isTimerVisible = !isTimerVisible;
+            document.getElementById('timer-display').style.visibility = isTimerVisible ? 'visible' : 'hidden';
+        }
+
+        function promptAdjustTimer() {
+            const input = prompt("Enter remaining minutes (0 for Untimed):", Math.ceil(timerSeconds / 60));
+            if (input === null) return;
+            const mins = parseInt(input, 10);
+            if (!isNaN(mins)) {
+                isUntimed = mins <= 0;
+                initialTimerSeconds = isUntimed ? 0 : mins * 60;
+                timerSeconds = initialTimerSeconds;
+                updateTimerDisplay();
+            }
+        }
+
+        function setTheme(theme) {
+            document.body.className = `h-screen flex flex-col overflow-hidden font-sans antialiased theme-${theme}`;
+        }
+
+        function setFontSize(sizeClass) {
+            document.getElementById('passage-content').className = `${sizeClass} leading-relaxed space-y-3.5`;
+            document.getElementById('questions-container').className = `space-y-4 ${sizeClass}`;
+        }
+
+        function setupResizer() {
+            const resizer = document.getElementById('resizer');
+            const leftPane = document.getElementById('left-pane');
+            const rightPane = document.getElementById('right-pane');
+            let dragging = false;
+
+            resizer.onmousedown = () => { dragging = true; resizer.classList.add('active'); document.body.style.userSelect = 'none'; };
+            document.onmousemove = (e) => {
+                if (!dragging) return;
+                const totalW = document.getElementById('split-pane').offsetWidth;
+                const leftPct = (e.clientX / totalW) * 100;
+                if (leftPct > 20 && leftPct < 80) {
+                    leftPane.style.width = `${leftPct}%`;
+                    rightPane.style.width = `${100 - leftPct}%`;
+                }
+            };
+            document.onmouseup = () => { dragging = false; resizer.classList.remove('active'); document.body.style.userSelect = ''; };
+        }
+
+        function normalizeAnswer(str) {
+            return String(str || '').trim().toLowerCase().replace(/^\((.*)\)$/, '$1').replace(/\s+/g, ' ').trim();
+        }
+
+        function checkIsAnswerCorrect(userRaw, officialRaw) {
+            const u = normalizeAnswer(userRaw);
+            if (!u || !officialRaw) return false;
+            const variants = String(officialRaw).split('/').map(v => normalizeAnswer(v));
+            if (variants.includes(u)) return true;
+            if (u === 't' && variants.includes('true')) return true;
+            if (u === 'f' && variants.includes('false')) return true;
+            if (u === 'ng' && variants.includes('not given')) return true;
+            if (u === 'y' && variants.includes('yes')) return true;
+            if (u === 'n' && variants.includes('no')) return true;
+            return false;
+        }
+
+        function calculateIeltsBand(score) {
+            if (score >= 39) return 9.0;
+            if (score >= 37) return 8.5;
+            if (score >= 35) return 8.0;
+            if (score >= 33) return 7.5;
+            if (score >= 30) return 7.0;
+            if (score >= 27) return 6.5;
+            if (score >= 23) return 6.0;
+            if (score >= 19) return 5.5;
+            if (score >= 15) return 5.0;
+            if (score >= 13) return 4.5;
+            if (score >= 10) return 4.0;
+            if (score >= 8) return 3.5;
+            if (score >= 6) return 3.0;
+            return 2.5;
+        }
+
+        function submitAndGradeTest() {
+            clearInterval(timerInterval);
+            const allKeys = {};
+            const allQs = [];
+            examData.parts.forEach(p => {
+                Object.assign(allKeys, p.answers || {});
+                p.questions.forEach(q => allQs.push({ id: q.id, partId: p.id }));
+            });
+
+            const hasKeys = Object.keys(allKeys).length > 0;
+            document.getElementById('key-warning-badge').classList.toggle('hidden', hasKeys);
+
+            let correctCount = 0;
+            let listHtml = '';
+
+            allQs.forEach(({ id, partId }) => {
+                const uAns = userAnswers[id] || '';
+                const cAns = allKeys[id] || '';
+                const isOk = hasKeys ? checkIsAnswerCorrect(uAns, cAns) : Boolean(uAns);
+                if (hasKeys && isOk) correctCount++;
+
+                listHtml += `
+                    <div onclick="closeResultModal(); jumpToQuestion(${id}, ${partId});" class="cursor-pointer flex items-center justify-between p-2.5 rounded border text-xs ${isOk ? 'bg-emerald-50 border-emerald-200 text-emerald-950' : 'bg-rose-50 border-rose-200 text-rose-950'}">
+                        <div>
+                            <span class="inline-flex items-center justify-center w-6 h-6 rounded bg-slate-900 text-white font-bold mr-2">${id}</span>
+                            <span>Your answer: <b>${uAns || '(blank)'}</b></span>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            ${hasKeys ? `<span>Key: <b>${cAns || 'N/A'}</b></span>` : ''}
+                            <span class="px-1.5 py-0.5 rounded font-bold text-[10px] ${isOk ? 'bg-emerald-200 text-emerald-900' : 'bg-rose-200 text-rose-900'}">${hasKeys ? (isOk ? '✓' : '✗') : 'SAVED'}</span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            const totalQCount = allQs.length || 40;
+            const band = hasKeys ? calculateIeltsBand(correctCount) : 0;
+            const elapsed = isUntimed ? timerSeconds : (initialTimerSeconds - timerSeconds);
+            const eMins = Math.floor(Math.max(0, elapsed) / 60);
+            const eSecs = Math.max(0, elapsed) % 60;
+
+            document.getElementById('report-test-title').textContent = examData.title;
+            document.getElementById('res-score').textContent = hasKeys ? `${correctCount} / ${totalQCount}` : `${Object.keys(userAnswers).length} / ${totalQCount}`;
+            document.getElementById('res-band').textContent = hasKeys ? band.toFixed(1) : 'N/A';
+            document.getElementById('res-time').textContent = `${String(eMins).padStart(2, '0')}:${String(eSecs).padStart(2, '0')}`;
+            document.getElementById('res-details-list').innerHTML = listHtml;
+            document.getElementById('result-modal').classList.remove('hidden');
+        }
+
+        function closeResultModal() {
+            document.getElementById('result-modal').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>

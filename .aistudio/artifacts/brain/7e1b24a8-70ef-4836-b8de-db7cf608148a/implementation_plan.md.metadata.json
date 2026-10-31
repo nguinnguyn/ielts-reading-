@@ -1,0 +1,6 @@
+{
+  "summary":  "Kế hoạch triển khai nâng cấp ứng dụng IELTS on Computer — Reading Simulator: giữ nguyên bố cục phòng thi chuẩn Inspera, loại bỏ ô nhập API Key thủ công để chuyển sang xử lý bóc tách PDF tự động bằng Gemini AI phía máy chủ, sửa các lỗi hiển thị/highlight/bộ hẹn giờ và tích hợp tài khoản Google cùng cơ sở dữ liệu đám mây Firebase để đồng bộ thư viện đề thi và lịch sử điểm số qua nhiều thiết bị.",
+  "updatedAt":  "2026-10-31T11:19:00.752121330Z",
+  "requestFeedback":  true,
+  "userFacing":  true
+}
